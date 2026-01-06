@@ -1,0 +1,57 @@
+name: Deploy Frontend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - prod
+
+env:
+  PROJECT_ID: hearth-483320
+  PROJECT_NUMBER: 104062859285
+  REGION: us-central1
+  ARTIFACT_REPO: hearth-containers
+  IMAGE_NAME: frontend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+          service_account: github-deployer@hearth-483320.iam.gserviceaccount.com
+
+      - name: Configure Docker
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build & Push Frontend Image
+        run: |
+          IMAGE_URI=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker build -t $IMAGE_URI ./frontend
+          docker push $IMAGE_URI
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Deploy to Cloud Run
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            SERVICE_NAME="fe-staging"
+          else
+            SERVICE_NAME="fe-prod"
+          fi
+
+          gcloud run deploy $SERVICE_NAME \
+            --image $IMAGE_URI \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --allow-unauthenticated
