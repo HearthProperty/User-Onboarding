@@ -8,7 +8,7 @@ on:
 
 env:
   PROJECT_ID: hearth-483320
-  PROJECT_NUMBER: 104062859285
+  PROJECT_NUMBER: 1024761164316
   REGION: us-central1
   ARTIFACT_REPO: hearth-containers
   IMAGE_NAME: frontend
